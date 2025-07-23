@@ -3,6 +3,7 @@
 
 ![样例](assets/README/1.png "实例")
 
+## 在线体验无需下载 [点击这里访问](https://gaziwang.github.io/XXQG/)
 
 ## 本次更新内容
 
