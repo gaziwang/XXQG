@@ -6,18 +6,20 @@
 		<meta name="viewport"
 			content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover" />
 		<link rel="stylesheet" href="style.css" />
+		<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 	</head>
 	<body>
 		<div id="app">
-			<div class="nav">
+			<!-- 删除导航图片部分 -->
+			<!-- <div class="nav">
 				<img src="img/nav.png" alt="" />
-			</div>
+			</div> -->
 
 			<header>
 				<div class="left">
 					<img src="img/right.png" alt="" />
 				</div>
-				<div class="title" @click="modifyDate">积分明细</div>
+				<div class="title" @click="showSetting = true">积分明细</div>
 			</header>
 
 			<main>
@@ -32,7 +34,7 @@
 					<li class="now">
 						<p class="date">今日</p>
 						<div class="chat" style="height: 66%;">
-							<p class="score">44分</p>
+							<p class="score"><span class="nowrap-score">44分</span></p>
 						</div>
 					</li>
 
@@ -43,17 +45,17 @@
 			<div class="my-info">
 				<div class="left">
 					<div class="left-container">
-						<div class="tx">蒙召</div>
+						<div class="tx">{{userName.slice(-2)}}</div>
 						<div class="left-container-right">
-							<div class="name">王蒙召</div>
+							<div class="name">{{userName}}</div>
 							<div class="date">{{now}} {{week}}</div>
 						</div>
 					</div>
 				</div>
 
 				<div class="right">
-					<div class="now-score">当日积分：<span>44</span></div>
-					<div class="year-score">&nbsp;年度积分：<span>44</span>
+					<div class="now-score">当日积分：<span>{{todayScore}}</span></div>
+					<div class="year-score">&nbsp;年度积分：<span>{{yearScore}}</span>
 						<img src="img/tanhao.png" alt="" />
 					</div>
 				</div>
@@ -70,11 +72,43 @@
 					</li>
 				</ul>
 			</footer>
+			<!-- 设置弹窗 -->
+			<div v-if="showSetting" class="modal-mask">
+				<div class="modal-container">
+					<h3>设置</h3>
+					<label>姓名：<input v-model="settingName" placeholder="XXX" /></label><br/>
+					<label>日期：<input type="date" v-model="settingDate" /></label><br/>
+					<label>当日积分：<input type="number" v-model.number="settingTodayScore" min="0" /></label><br/>
+					<label>年度积分：<input type="number" v-model.number="settingYearScore" min="0" /></label><br/>
+					<div class="modal-btns">
+						<button @click="saveSetting">保存</button>
+						<button @click="showSetting = false">取消</button>
+						<button @click="captureScreen" type="button">截图</button>
+					</div>
+				</div>
+			</div>
 		</div>
 	</body>
 </html>
 <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
 <script>
+	// 自动全屏函数
+	function launchFullScreen(element) {
+		if(element.requestFullscreen) {
+			element.requestFullscreen();
+		} else if(element.mozRequestFullScreen) {
+			element.mozRequestFullScreen();
+		} else if(element.webkitRequestFullscreen) {
+			element.webkitRequestFullscreen();
+		} else if(element.msRequestFullscreen) {
+			element.msRequestFullscreen();
+		}
+	}
+
+	document.addEventListener('DOMContentLoaded', function() {
+		launchFullScreen(document.documentElement);
+	});
+
 	const app = new Vue({
 		el: '#app',
 		data: {
@@ -82,10 +116,22 @@
 			week: '周八',
 			randomTimeList: [],
 			studyList: [],
-			chatList: []
+			chatList: [],
+			currentHour: 23,
+			currentMinute: 59,
+			showSetting: false,
+			userName: 'XXX',
+			todayScore: 44,
+			yearScore: 44,
+			settingName: '',
+			settingDate: '',
+			settingTodayScore: 44,
+			settingYearScore: 44,
+			useCustomDate: false
 		},
 		created() {
-			this.getNowDate()
+			this.loadSetting();
+			this.getNetworkTime();
 		},
 		methods: {
 			getWeek(date) {
@@ -95,16 +141,35 @@
 				});
 				this.week = dayOfWeek
 			},
+			async getNetworkTime() {
+				try {
+					// 使用 worldtimeapi 获取网络时间
+					const response = await fetch('https://worldtimeapi.org/api/ip');
+					const data = await response.json();
+					const dateStr = data.datetime; // 例如 2024-05-10T13:45:30.123456+08:00
+					const currentDate = new Date(dateStr);
+					this.currentHour = currentDate.getHours();
+					this.currentMinute = currentDate.getMinutes();
+					this.getNowDate(currentDate);
+					this.getRandomTime();
+				} catch (e) {
+					// 获取失败则用本地时间兜底
+					const currentDate = new Date();
+					this.currentHour = currentDate.getHours();
+					this.currentMinute = currentDate.getMinutes();
+					this.getNowDate(currentDate);
+					this.getRandomTime();
+				}
+			},
 			getNowDate(date = '') {
+				let currentDate;
 				if (date == '') {
-					// 获取当前日期
-					var currentDate = new Date();
+					currentDate = new Date();
 				} else {
-					// 获取当前日期
-					var currentDate = new Date(date);
+					currentDate = new Date(date);
 				}
 
-				this.getRandomTime();
+				// this.getRandomTime(); // 移除这行，避免在 currentHour 未更新时生成随机时间
 
 				// 格式化日期为 "YYYY.MM.DD" 格式  
 				var formattedDate = currentDate.getFullYear() + '.' +
@@ -112,7 +177,7 @@
 					('0' + currentDate.getDate()).slice(-2);
 
 				this.now = formattedDate;
-				this.getWeek(this.now)
+				this.getWeek(currentDate)
 
 				let list = []
 				for (let i = 3; i >= 1; i--) {
@@ -128,18 +193,21 @@
 				this.getNowDate(date)
 			},
 			getRandomTime() {
-				// 生成随机时:分事件
+				// 生成随机时:分事件，不能超过当前时间
+				const padZero = num => num.toString().padStart(2, '0');
+				const maxHour = this.currentHour;
+				const maxMinute = this.currentMinute;
 				function generateRandomTime() {
-					const padZero = num => num.toString().padStart(2, '0');
-					const hours = padZero(Math.floor(Math.random() * 24));
-					const minutes = padZero(Math.floor(Math.random() * 60));
-					return `${hours}:${minutes}`;
+					let hour = Math.floor(Math.random() * (maxHour + 1));
+					let minute;
+					if (hour === maxHour) {
+						minute = Math.floor(Math.random() * (maxMinute + 1));
+					} else {
+						minute = Math.floor(Math.random() * 60);
+					}
+					return padZero(hour) + ':' + padZero(minute);
 				}
-
-				// 生成六个随机事件，排序并显示
-				const randomEvents = Array.from({
-					length: 6
-				}, generateRandomTime);
+				const randomEvents = Array.from({ length: 6 }, generateRandomTime);
 				this.randomTimeList = randomEvents.sort((a, b) => b.localeCompare(a))
 			},
 			shuffleArray(array) {
@@ -178,7 +246,115 @@
 
 				this.shuffleArray(studyList)
 				this.studyList = studyList
+			},
+			loadSetting() {
+				const setting = localStorage.getItem('xxqg_setting');
+				if (setting) {
+					const obj = JSON.parse(setting);
+					this.userName = obj.userName || 'XXX';
+					this.todayScore = obj.todayScore || 44;
+					this.yearScore = obj.yearScore || 44;
+					this.settingName = obj.userName || 'XXX';
+					this.settingTodayScore = obj.todayScore || 44;
+					this.settingYearScore = obj.yearScore || 44;
+					// 不再缓存 settingDate，每次刷新都用网络时间
+					this.settingDate = '';
+					this.useCustomDate = false;
+				}
+			},
+			saveSetting() {
+				this.userName = this.settingName || 'XXX';
+				this.todayScore = this.settingTodayScore;
+				this.yearScore = this.settingYearScore;
+				if (this.settingDate && this.settingDate !== '') {
+					this.useCustomDate = true;
+					this.getNowDate(this.settingDate);
+				} else {
+					this.useCustomDate = false;
+					this.getNetworkTime();
+				}
+				// 只缓存姓名、当日积分、年度积分，不缓存日期
+				localStorage.setItem('xxqg_setting', JSON.stringify({
+					userName: this.userName,
+					todayScore: this.todayScore,
+					yearScore: this.yearScore
+				}));
+				this.showSetting = false;
+			},
+			captureScreen() {
+				// 临时隐藏弹窗再截图，截图后恢复
+				const modal = document.querySelector('.modal-mask');
+				if (modal) modal.style.display = 'none';
+				this.$nextTick(() => {
+					html2canvas(document.getElementById('app')).then(canvas => {
+						if (modal) modal.style.display = '';
+						const link = document.createElement('a');
+						link.href = canvas.toDataURL('image/png');
+						link.download = 'xxqg_screenshot.png';
+						// 兼容性处理
+						if (typeof link.click === 'function') {
+							link.click();
+						} else {
+							window.open(link.href, '_blank');
+						}
+					});
+				});
 			}
 		}
 	})
 </script>
+<style>
+.modal-mask {
+	position: fixed;
+	z-index: 9999;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	background: rgba(0,0,0,0.4);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.modal-container {
+	background: #fff;
+	border-radius: 8px;
+	padding: 24px 32px;
+	min-width: 260px;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.modal-container h3 {
+	margin-top: 0;
+	margin-bottom: 16px;
+}
+.modal-container label {
+	display: block;
+	margin-bottom: 10px;
+}
+.modal-container input {
+	margin-left: 8px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	border: 1px solid #ccc;
+}
+.modal-btns {
+	margin-top: 16px;
+	text-align: right;
+}
+.modal-btns button {
+	margin-left: 12px;
+	padding: 4px 16px;
+	border-radius: 4px;
+	border: none;
+	background: #1976d2;
+	color: #fff;
+	cursor: pointer;
+}
+.modal-btns button:last-child {
+	background: #aaa;
+}
+.nowrap-score {
+	display: inline-block;
+	white-space: nowrap;
+}
+</style>
